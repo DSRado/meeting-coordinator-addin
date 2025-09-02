@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Meeting Coordinator - PoC</title>
+    
+    <!-- Office JavaScript API -->
+    <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+    
+    <!-- Fluent UI CSS for Office-like styling -->
+    <link rel="stylesheet" href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/11.0.0/css/fabric.min.css" />
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background-color: #faf9f8;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
+            color: white;
+            padding: 16px;
+            margin: -16px -16px 20px -16px;
+            border-radius: 0 0 8px 8px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .header p {
+            margin: 4px 0 0 0;
+            opacity: 0.9;
+            font-size: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #323130;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d2d0ce;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #0078d4;
+            box-shadow: 0 0 0 1px #0078d4;
+        }
+        
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-family: inherit;
+        }
+        
+        .btn-primary {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s ease;
+        }
+        
+        .btn-primary:hover {
+            background-color: #106ebe;
+        }
+        
+        .btn-primary:disabled {
+            background-color: #a19f9d;
+            cursor: not-allowed;
+        }
+        
+        .status-container {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .status-success {
+            background-color: #dff6dd;
+            border: 1px solid #107c10;
+            color: #107c10;
+        }
+        
+        .status-error {
+            background-color: #fde7e9;
+            border: 1px solid #d13438;
+            color: #d13438;
+        }
+        
+        .status-info {
+            background-color: #deecf9;
+            border: 1px solid #0078d4;
+            color: #0078d4;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .meeting-details {
+            background-color: white;
+            border: 1px solid #d2d0ce;
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+        
+        .meeting-details h4 {
+            margin: 0 0 8px 0;
+            color: #323130;
+        }
+        
+        .meeting-details p {
+            margin: 4px 0;
+            font-size: 13px;
+        }
+        
+        .teams-link {
+            color: #0078d4;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        
+        .teams-link:hover {
+            text-decoration: underline;
+        }
+        
+        .help-text {
+            font-size: 12px;
+            color: #605e5c;
+            margin-top: 4px;
+        }
+        
+        .demo-badge {
+            background-color: #ff8c00;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>AI Meeting Coordinator <span class="demo-badge">PoC</span></h1>
+        <p>Automate your meeting scheduling with AI assistance</p>
+    </div>
+    
+    <div class="form-group">
+        <label class="form-label" for="attendees">Attendee Email Addresses</label>
+        <input type="text" 
+               id="attendees" 
+               class="form-input" 
+               placeholder="alice@company.com, bob@company.com"
+               autocomplete="off">
+        <div class="help-text">Enter email addresses separated by commas</div>
+    </div>
+    
+    <div class="form-group">
+        <label class="form-label" for="description">Meeting Description</label>
+        <textarea id="description" 
+                  class="form-input form-textarea" 
+                  placeholder="Discuss Q4 marketing strategy and budget planning"
+                  autocomplete="off"></textarea>
+        <div class="help-text">Describe the purpose and topics for the meeting</div>
+    </div>
+    
+    <button id="coordinateBtn" class="btn-primary" onclick="coordinateMeeting()">
+        Coordinate Meeting
+    </button>
+    
+    <div id="statusContainer" class="status-container">
+        <div id="statusMessage"></div>
+        <div id="meetingDetails" class="meeting-details" style="display: none;">
+            <h4>Meeting Successfully Scheduled!</h4>
+            <p><strong>Subject:</strong> <span id="meetingSubject"></span></p>
+            <p><strong>Time:</strong> <span id="meetingTime"></span></p>
+            <p><strong>Teams Link:</strong> <a id="teamsLink" class="teams-link" href="#" target="_blank">Join Meeting</a></p>
+            <p><strong>Conference ID:</strong> <span id="conferenceId"></span></p>
+        </div>
+    </div>
+
+    <script>
+        // Azure Function Configuration (Update these for your deployment)
+        const AZURE_FUNCTION_URL = 'https://your-function-app.azurewebsites.net/api/coordinate';
+        const FUNCTION_KEY = 'your-function-key-here';
+        
+        // Initialize Office Add-in
+        Office.onReady((info) => {
+            if (info.host === Office.HostType.Outlook) {
+                console.log('AI Meeting Coordinator Add-in loaded successfully');
+                
+                // Try to pre-populate fields from current email context
+                populateFromContext();
+            }
+        });
+        
+        function populateFromContext() {
+            try {
+                // Get current item (email or appointment)
+                const item = Office.context.mailbox.item;
+                
+                if (item) {
+                    // Try to extract attendees from current email
+                    if (item.to && item.to.length > 0) {
+                        const attendeeEmails = item.to.map(recipient => recipient.emailAddress).join(', ');
+                        document.getElementById('attendees').value = attendeeEmails;
+                    }
+                    
+                    // Try to extract subject for description
+                    if (item.subject) {
+                        const subjectText = item.subject.replace(/^(RE:|FW:|FWD:)\s*/i, '').trim();
+                        if (subjectText && !document.getElementById('description').value) {
+                            document.getElementById('description').value = `Discuss: ${subjectText}`;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log('Could not populate from context:', error);
+                // This is expected in some scenarios, so we continue silently
+            }
+        }
+        
+        async function coordinateMeeting() {
+            const attendeesInput = document.getElementById('attendees');
+            const descriptionInput = document.getElementById('description');
+            const coordinateBtn = document.getElementById('coordinateBtn');
+            const statusContainer = document.getElementById('statusContainer');
+            const statusMessage = document.getElementById('statusMessage');
+            const meetingDetails = document.getElementById('meetingDetails');
+            
+            // Get form values
+            const attendees = attendeesInput.value.trim();
+            const description = descriptionInput.value.trim();
+            
+            // Validate input
+            if (!attendees) {
+                showStatus('error', 'Please enter at least one attendee email address.');
+                return;
+            }
+            
+            if (!description) {
+                showStatus('error', 'Please enter a meeting description.');
+                return;
+            }
+            
+            // Show loading state
+            coordinateBtn.disabled = true;
+            coordinateBtn.innerHTML = '<span class="loading-spinner"></span>Coordinating Meeting...';
+            showStatus('info', 'AI is coordinating your meeting. This may take a moment...');
+            
+            try {
+                // Get organizer email from Office context
+                let organizer = 'organizer@example.com';
+                try {
+                    if (Office.context.mailbox.userProfile && Office.context.mailbox.userProfile.emailAddress) {
+                        organizer = Office.context.mailbox.userProfile.emailAddress;
+                    }
+                } catch (e) {
+                    console.log('Could not get user email:', e);
+                }
+                
+                // Prepare request payload
+                const payload = {
+                    attendees: attendees,
+                    description: description,
+                    organizer: organizer
+                };
+                
+                // Make request to Azure Function
+                const response = await fetch(AZURE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-functions-key': FUNCTION_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showMeetingSuccess(result);
+                } else {
+                    showStatus('error', result.message || 'Meeting coordination failed. Please try again.');
+                }
+                
+            } catch (error) {
+                console.error('Error coordinating meeting:', error);
+                showStatus('error', 'Network error. Please check your connection and try again.');
+            } finally {
+                // Reset button state
+                coordinateBtn.disabled = false;
+                coordinateBtn.innerHTML = 'Coordinate Meeting';
+            }
+        }
+        
+        function showStatus(type, message) {
+            const statusContainer = document.getElementById('statusContainer');
+            const statusMessage = document.getElementById('statusMessage');
+            const meetingDetails = document.getElementById('meetingDetails');
+            
+            // Hide meeting details
+            meetingDetails.style.display = 'none';
+            
+            // Update status
+            statusContainer.className = `status-container status-${type}`;
+            statusContainer.style.display = 'block';
+            statusMessage.textContent = message;
+        }
+        
+        function showMeetingSuccess(result) {
+            const statusContainer = document.getElementById('statusContainer');
+            const statusMessage = document.getElementById('statusMessage');
+            const meetingDetails = document.getElementById('meetingDetails');
+            
+            // Show success status
+            statusContainer.className = 'status-container status-success';
+            statusContainer.style.display = 'block';
+            statusMessage.textContent = result.message || 'Meeting successfully coordinated!';
+            
+            // Show meeting details if available
+            if (result.meeting) {
+                const meeting = result.meeting;
+                
+                document.getElementById('meetingSubject').textContent = meeting.subject || 'AI Coordinated Meeting';
+                
+                // Format meeting time
+                let timeText = 'Time to be confirmed';
+                if (meeting.start && meeting.start.dateTime) {
+                    const startTime = new Date(meeting.start.dateTime);
+                    timeText = startTime.toLocaleString();
+                }
+                document.getElementById('meetingTime').textContent = timeText;
+                
+                // Set Teams link
+                const teamsLink = document.getElementById('teamsLink');
+                if (meeting.joinWebUrl) {
+                    teamsLink.href = meeting.joinWebUrl;
+                    teamsLink.textContent = 'Join Teams Meeting';
+                } else {
+                    teamsLink.href = '#';
+                    teamsLink.textContent = 'Teams link will be provided';
+                }
+                
+                // Set conference ID
+                document.getElementById('conferenceId').textContent = meeting.conferenceId || 'To be provided';
+                
+                meetingDetails.style.display = 'block';
+            }
+            
+            // Clear form
+            document.getElementById('attendees').value = '';
+            document.getElementById('description').value = '';
+        }
+        
+        // Handle Enter key in form fields
+        document.getElementById('attendees').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('description').focus();
+            }
+        });
+        
+        document.getElementById('description').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                coordinateMeeting();
+            }
+        });
+        
+        // Auto-resize textarea
+        document.getElementById('description').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.max(80, this.scrollHeight) + 'px';
+        });
+    </script>
+</body>
+</html>
+
