@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Meeting Coordinator Commands</title>
+    
+    <!-- Office JavaScript API -->
+    <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+</head>
+
+<body>
+    <!-- This page is used for function commands and doesn't need visible content -->
+    
+    <script>
+        // Azure Function Configuration
+        const AZURE_FUNCTION_URL = 'https://your-function-app.azurewebsites.net/api/coordinate';
+        const FUNCTION_KEY = 'your-function-key-here';
+        
+        // Initialize Office Add-in
+        Office.onReady(() => {
+            console.log('AI Meeting Coordinator Commands loaded');
+        });
+        
+        // Quick coordinate function (called from ribbon button)
+        function quickCoordinate(event) {
+            try {
+                // Get current item
+                const item = Office.context.mailbox.item;
+                
+                if (!item) {
+                    showNotification('No email selected', 'Please select an email to coordinate a meeting.');
+                    event.completed();
+                    return;
+                }
+                
+                // Extract attendees from current email
+                let attendees = [];
+                if (item.to && item.to.length > 0) {
+                    attendees = item.to.map(recipient => recipient.emailAddress);
+                }
+                
+                // Add sender if it's not the current user
+                if (item.from && item.from.emailAddress) {
+                    const userEmail = Office.context.mailbox.userProfile.emailAddress;
+                    if (item.from.emailAddress !== userEmail) {
+                        attendees.push(item.from.emailAddress);
+                    }
+                }
+                
+                if (attendees.length === 0) {
+                    showNotification('No attendees found', 'Could not find attendees in the current email.');
+                    event.completed();
+                    return;
+                }
+                
+                // Generate description from subject
+                let description = 'Follow-up meeting';
+                if (item.subject) {
+                    const subjectText = item.subject.replace(/^(RE:|FW:|FWD:)\s*/i, '').trim();
+                    description = `Discuss: ${subjectText}`;
+                }
+                
+                // Show processing notification
+                showNotification('Coordinating Meeting', 'AI is coordinating your meeting...');
+                
+                // Call Azure Function
+                coordinateMeetingQuick(attendees.join(', '), description)
+                    .then(result => {
+                        if (result.status === 'success') {
+                            showNotification('Meeting Coordinated!', 
+                                `Meeting successfully scheduled. Teams link: ${result.meeting?.joinWebUrl || 'Will be provided'}`);
+                        } else {
+                            showNotification('Coordination Failed', result.message || 'Please try again.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Quick coordinate error:', error);
+                        showNotification('Error', 'Failed to coordinate meeting. Please try again.');
+                    })
+                    .finally(() => {
+                        event.completed();
+                    });
+                
+            } catch (error) {
+                console.error('Quick coordinate error:', error);
+                showNotification('Error', 'An unexpected error occurred.');
+                event.completed();
+            }
+        }
+        
+        async function coordinateMeetingQuick(attendees, description) {
+            try {
+                // Get organizer email
+                let organizer = 'organizer@example.com';
+                if (Office.context.mailbox.userProfile && Office.context.mailbox.userProfile.emailAddress) {
+                    organizer = Office.context.mailbox.userProfile.emailAddress;
+                }
+                
+                // Prepare request payload
+                const payload = {
+                    attendees: attendees,
+                    description: description,
+                    organizer: organizer
+                };
+                
+                // Make request to Azure Function
+                const response = await fetch(AZURE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-functions-key': FUNCTION_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return await response.json();
+                
+            } catch (error) {
+                console.error('Error in coordinateMeetingQuick:', error);
+                throw error;
+            }
+        }
+        
+        function showNotification(title, message) {
+            try {
+                Office.context.mailbox.item.notificationMessages.addAsync('coordinateNotification', {
+                    type: 'informationalMessage',
+                    message: message,
+                    icon: 'icon1',
+                    persistent: false
+                });
+            } catch (error) {
+                console.error('Error showing notification:', error);
+                // Fallback to alert for debugging
+                alert(`${title}: ${message}`);
+            }
+        }
+        
+        // Make functions available globally for Office to call
+        window.quickCoordinate = quickCoordinate;
+        
+        // Register functions with Office
+        if (typeof Office !== 'undefined') {
+            Office.actions = Office.actions || {};
+            Office.actions.quickCoordinate = quickCoordinate;
+        }
+    </script>
+</body>
+</html>
+
